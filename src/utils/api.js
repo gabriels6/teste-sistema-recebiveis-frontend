@@ -87,6 +87,17 @@ function crud(resource) {
                 throw extractError(error);
             }
         },
+        // Liquida um registro preenchendo a data de liquidacao informada.
+        // Aplicavel a /api/transacoes/{id}/liquidacao; o back-end usa optimistic
+        // locking e responde 409 quando ha alteracao concorrente (mensagem
+        // propagada por extractError).
+        async liquidar(id, dataLiquidacao) {
+            try {
+                return unwrap(await api.post(`${path}/${id}/liquidacao`, { dataLiquidacao }));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
     };
 }
 
