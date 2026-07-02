@@ -14,9 +14,20 @@
  *              `refResource` e envia { id } no payload (objeto aninhado do back-end).
  *
  * Campos ref possuem `optionLabel(item)` para montar o texto de cada opcao.
+ *
+ * Acoes customizadas (opcional): `actions` lista botoes extras por registro na
+ * coluna "Acoes". Cada acao define:
+ *  - key/label/variant : identificacao e estilo do botao
+ *  - isAvailable(item)  : (opcional) exibe o botao apenas quando retorna true
+ *  - fields             : (opcional) campos coletados num modal antes de executar
+ *  - run(api, item, values) : executa a acao (recebe o CRUD da entidade)
+ *  - successMessage     : mensagem exibida ao concluir
  */
 
 export const CURRENCY_LABEL = (m) => (m ? m.codMoeda : '');
+
+/** Data de hoje no formato YYYY-MM-DD (usada como default da liquidacao). */
+const hoje = () => new Date().toISOString().slice(0, 10);
 
 const ENTITIES = {
     funcaos: {
@@ -128,7 +139,9 @@ const ENTITIES = {
         title: 'Transacoes',
         fields: [
             { key: 'dataOperacao', label: 'Data de Operacao', type: 'date' },
-            { key: 'dataLiquidacao', label: 'Data de Liquidacao', type: 'date', optional: true },
+            // Exibida na tabela, mas fora do formulario: a liquidacao e feita pela
+            // acao "Liquidar" (formHidden preserva o valor no payload ao editar).
+            { key: 'dataLiquidacao', label: 'Data de Liquidacao', type: 'date', optional: true, formHidden: true },
             { key: 'qtdeOperacao', label: 'Quantidade da Operacao', type: 'number' },
             {
                 key: 'usuario',
@@ -150,6 +163,21 @@ const ENTITIES = {
                 type: 'ref',
                 refResource: 'moedas',
                 optionLabel: CURRENCY_LABEL,
+            },
+        ],
+        actions: [
+            {
+                key: 'liquidar',
+                label: 'Liquidar',
+                variant: 'outline-success',
+                // So oferece a liquidacao para transacoes ainda nao liquidadas.
+                isAvailable: (item) => !item.dataLiquidacao,
+                // Coleta a data de liquidacao (default: hoje) antes de executar.
+                fields: [
+                    { key: 'dataLiquidacao', label: 'Data de Liquidacao', type: 'date', default: hoje },
+                ],
+                run: (api, item, values) => api.liquidar(item.id, values.dataLiquidacao),
+                successMessage: 'Transacao liquidada com sucesso.',
             },
         ],
     },
