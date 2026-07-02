@@ -1,0 +1,17 @@
+.crud-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.crud-actions {
+    display: flex;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.crud-empty {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+}

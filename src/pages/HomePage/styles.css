@@ -1,0 +1,14 @@
+.home-lead {
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+
+.home-card {
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    border: 1px solid #e0e4ea;
+}
+
+.home-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(13, 27, 42, 0.12);
+}
