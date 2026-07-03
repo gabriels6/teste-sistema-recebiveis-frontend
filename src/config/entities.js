@@ -116,6 +116,22 @@ const ENTITIES = {
             { key: 'dataReferencia', label: 'Data de Referencia', type: 'date' },
             { key: 'valor', label: 'Valor', type: 'number' },
         ],
+        // Acao de nivel de pagina: importa a cotacao de Fechamento PTAX do Banco
+        // Central para a moeda/data informadas (moeda -> Real). Idempotente: a
+        // moeda e criada se nao existir e a taxa e atualizada se ja houver.
+        pageActions: [
+            {
+                key: 'importar-ptax',
+                label: 'Importar do BCB (PTAX) por data',
+                variant: 'outline-primary',
+                fields: [
+                    { key: 'moeda', label: 'Moeda (ex.: EUR)', type: 'text', default: 'EUR' },
+                    { key: 'data', label: 'Data da cotacao', type: 'date', default: hoje },
+                ],
+                run: (api, item, values) => api.importarPtax(values),
+                successMessage: 'Cotacao PTAX importada com sucesso.',
+            },
+        ],
     },
 
     recebiveis: {
