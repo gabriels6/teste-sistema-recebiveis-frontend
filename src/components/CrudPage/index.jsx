@@ -20,6 +20,9 @@ function renderCell(field, item) {
     if (field.type === 'ref') {
         return value ? field.optionLabel(value) : '-';
     }
+    if (field.format) {
+        return field.format(value);
+    }
     if (value === null || value === undefined || value === '') {
         return '-';
     }
@@ -82,6 +85,9 @@ const CrudPage = ({ entity }) => {
             payload.id = editingId;
         }
         entity.fields.forEach((field) => {
+            if (field.computed) {
+                return; // valores calculados nao vao no payload
+            }
             const raw = form[field.key];
             if (field.type === 'ref') {
                 payload[field.key] = raw ? { id: Number(raw) } : null;
@@ -183,6 +189,25 @@ const CrudPage = ({ entity }) => {
         runAction(activeAction.action, activeAction.item, actionForm);
     }
 
+    /** Indica se todos os campos exigidos por uma acao de formulario estao preenchidos. */
+    function isFormActionReady(formAction) {
+        return (formAction.requiredFields || []).every(
+            (key) => form[key] !== '' && form[key] != null
+        );
+    }
+
+    /** Executa uma acao de formulario (ex.: calcular desagio) com o payload atual. */
+    function runFormAction(formAction) {
+        appContext.clearMessages();
+        Promise.resolve(formAction.run(api, buildPayload()))
+            .then((result) => {
+                appContext.handleSuccess(
+                    formAction.message ? formAction.message(result) : `${formAction.label}: concluido.`
+                );
+            })
+            .catch((error) => appContext.handleError(error));
+    }
+
     return (
         <div className="page">
             <div className="page-title">{entity.title}</div>
@@ -192,7 +217,7 @@ const CrudPage = ({ entity }) => {
                 <h2>{editingId != null ? 'Editar registro' : 'Novo registro'}</h2>
                 <Form onSubmit={handleSubmit}>
                     <div className="crud-form-grid">
-                        {entity.fields.filter((field) => !field.formHidden).map((field) => (
+                        {entity.fields.filter((field) => !field.formHidden && !field.computed).map((field) => (
                             <Form.Group key={field.key} controlId={`field-${field.key}`}>
                                 <Form.Label>{field.label}</Form.Label>
                                 {field.type === 'ref' ? (
@@ -230,6 +255,17 @@ const CrudPage = ({ entity }) => {
                         <Button variant="outline-secondary" onClick={loadItems}>
                             Recarregar
                         </Button>
+                        {(entity.formActions || []).map((formAction) => (
+                            <Button
+                                key={formAction.key}
+                                type="button"
+                                variant={formAction.variant || 'outline-info'}
+                                disabled={!isFormActionReady(formAction)}
+                                onClick={() => runFormAction(formAction)}
+                            >
+                                {formAction.label}
+                            </Button>
+                        ))}
                     </div>
                 </Form>
             </div>
