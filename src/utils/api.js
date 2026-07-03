@@ -98,6 +98,16 @@ function crud(resource) {
                 throw extractError(error);
             }
         },
+        // Calcula o desagio (valor presente / preco unitario - 1) sem gravar o
+        // registro. Aplicavel a /api/transacoes/desagio; recebe o payload da
+        // transacao e retorna { valorPresente, precoUnitario, desagio, moeda }.
+        async calcularDesagio(payload) {
+            try {
+                return unwrap(await api.post(`${path}/desagio`, payload));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
     };
 }
 
