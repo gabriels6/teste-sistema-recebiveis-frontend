@@ -87,6 +87,37 @@ function crud(resource) {
                 throw extractError(error);
             }
         },
+        // Liquida um registro preenchendo a data de liquidacao informada.
+        // Aplicavel a /api/transacoes/{id}/liquidacao; o back-end usa optimistic
+        // locking e responde 409 quando ha alteracao concorrente (mensagem
+        // propagada por extractError).
+        async liquidar(id, dataLiquidacao) {
+            try {
+                return unwrap(await api.post(`${path}/${id}/liquidacao`, { dataLiquidacao }));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
+        // Calcula o desagio (valor presente / preco unitario - 1) sem gravar o
+        // registro. Aplicavel a /api/transacoes/desagio; recebe o payload da
+        // transacao e retorna { valorPresente, precoUnitario, desagio, moeda }.
+        async calcularDesagio(payload) {
+            try {
+                return unwrap(await api.post(`${path}/desagio`, payload));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
+        // Importa a cotacao de fechamento PTAX (Banco Central) de uma moeda numa
+        // data. Aplicavel a /api/taxas-cambio/importacoes-ptax; recebe
+        // { moeda, data } (data em ISO yyyy-MM-dd) e retorna a taxa gravada.
+        async importarPtax({ moeda, data }) {
+            try {
+                return unwrap(await api.post(`${path}/importacoes-ptax`, { moeda, data }));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
     };
 }
 

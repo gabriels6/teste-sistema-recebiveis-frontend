@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { Button, Form, Table } from 'react-bootstrap';
+import { Button, Form, Modal, Table } from 'react-bootstrap';
 import AppContext from '../../context/AppContext';
 import MessageHolder from '../MessageHolder';
 import recebiveisApi from '../../utils/api';
@@ -20,6 +20,9 @@ function renderCell(field, item) {
     if (field.type === 'ref') {
         return value ? field.optionLabel(value) : '-';
     }
+    if (field.format) {
+        return field.format(value);
+    }
     if (value === null || value === undefined || value === '') {
         return '-';
     }
@@ -38,6 +41,9 @@ const CrudPage = ({ entity }) => {
     const [form, setForm] = useState(buildEmptyForm(entity.fields));
     const [editingId, setEditingId] = useState(null);
     const [refOptions, setRefOptions] = useState({});
+    // Acao customizada em curso (ex.: liquidar), com o item alvo e os valores do modal.
+    const [activeAction, setActiveAction] = useState(null);
+    const [actionForm, setActionForm] = useState({});
 
     const api = recebiveisApi.resource(entity.resource);
 
@@ -79,6 +85,9 @@ const CrudPage = ({ entity }) => {
             payload.id = editingId;
         }
         entity.fields.forEach((field) => {
+            if (field.computed) {
+                return; // valores calculados nao vao no payload
+            }
             const raw = form[field.key];
             if (field.type === 'ref') {
                 payload[field.key] = raw ? { id: Number(raw) } : null;
@@ -144,16 +153,86 @@ const CrudPage = ({ entity }) => {
             .catch((error) => appContext.handleError(error));
     }
 
+    /** Resolve o valor default de um campo de acao (aceita valor ou funcao). */
+    function resolveDefault(field) {
+        const raw = typeof field.default === 'function' ? field.default() : field.default;
+        return raw != null ? raw : '';
+    }
+
+    /** Dispara uma acao customizada: abre o modal (se houver campos) ou executa direto. */
+    function startAction(action, item) {
+        appContext.clearMessages();
+        if (action.fields && action.fields.length > 0) {
+            const initial = {};
+            action.fields.forEach((field) => {
+                initial[field.key] = resolveDefault(field);
+            });
+            setActionForm(initial);
+            setActiveAction({ action, item });
+        } else {
+            runAction(action, item, {});
+        }
+    }
+
+    function runAction(action, item, values) {
+        Promise.resolve(action.run(api, item, values))
+            .then(() => {
+                appContext.handleSuccess(action.successMessage || `${entity.title}: acao concluida com sucesso.`);
+                setActiveAction(null);
+                loadItems();
+            })
+            .catch((error) => appContext.handleError(error));
+    }
+
+    function handleActionConfirm(event) {
+        event.preventDefault();
+        runAction(activeAction.action, activeAction.item, actionForm);
+    }
+
+    /** Indica se todos os campos exigidos por uma acao de formulario estao preenchidos. */
+    function isFormActionReady(formAction) {
+        return (formAction.requiredFields || []).every(
+            (key) => form[key] !== '' && form[key] != null
+        );
+    }
+
+    /** Executa uma acao de formulario (ex.: calcular desagio) com o payload atual. */
+    function runFormAction(formAction) {
+        appContext.clearMessages();
+        Promise.resolve(formAction.run(api, buildPayload()))
+            .then((result) => {
+                appContext.handleSuccess(
+                    formAction.message ? formAction.message(result) : `${formAction.label}: concluido.`
+                );
+            })
+            .catch((error) => appContext.handleError(error));
+    }
+
     return (
         <div className="page">
             <div className="page-title">{entity.title}</div>
             <MessageHolder />
 
+            {(entity.pageActions || []).length > 0 ? (
+                <div className="page-actions">
+                    {entity.pageActions.map((pageAction) => (
+                        <Button
+                            key={pageAction.key}
+                            type="button"
+                            variant={pageAction.variant || 'outline-primary'}
+                            onClick={() => startAction(pageAction, null)}
+                        >
+                            {pageAction.label}
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
+
             <div className="card-panel">
                 <h2>{editingId != null ? 'Editar registro' : 'Novo registro'}</h2>
                 <Form onSubmit={handleSubmit}>
                     <div className="crud-form-grid">
-                        {entity.fields.map((field) => (
+                        {entity.fields.filter((field) => !field.formHidden && !field.computed).map((field) => (
                             <Form.Group key={field.key} controlId={`field-${field.key}`}>
                                 <Form.Label>{field.label}</Form.Label>
                                 {field.type === 'ref' ? (
@@ -191,6 +270,17 @@ const CrudPage = ({ entity }) => {
                         <Button variant="outline-secondary" onClick={loadItems}>
                             Recarregar
                         </Button>
+                        {(entity.formActions || []).map((formAction) => (
+                            <Button
+                                key={formAction.key}
+                                type="button"
+                                variant={formAction.variant || 'outline-info'}
+                                disabled={!isFormActionReady(formAction)}
+                                onClick={() => runFormAction(formAction)}
+                            >
+                                {formAction.label}
+                            </Button>
+                        ))}
                     </div>
                 </Form>
             </div>
@@ -237,6 +327,18 @@ const CrudPage = ({ entity }) => {
                                             >
                                                 Remover
                                             </Button>
+                                            {(entity.actions || [])
+                                                .filter((action) => !action.isAvailable || action.isAvailable(item))
+                                                .map((action) => (
+                                                    <Button
+                                                        key={action.key}
+                                                        size="sm"
+                                                        variant={action.variant || 'outline-secondary'}
+                                                        onClick={() => startAction(action, item)}
+                                                    >
+                                                        {action.label}
+                                                    </Button>
+                                                ))}
                                         </td>
                                     </tr>
                                 ))
@@ -245,6 +347,37 @@ const CrudPage = ({ entity }) => {
                     </Table>
                 </div>
             </div>
+
+            <Modal show={activeAction != null} onHide={() => setActiveAction(null)}>
+                <Form onSubmit={handleActionConfirm}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>{activeAction?.action.label}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {(activeAction?.action.fields || []).map((field) => (
+                            <Form.Group key={field.key} controlId={`action-${field.key}`} className="mb-3">
+                                <Form.Label>{field.label}</Form.Label>
+                                <Form.Control
+                                    type={field.type === 'number' ? 'number' : field.type}
+                                    step={field.type === 'number' ? 'any' : undefined}
+                                    value={actionForm[field.key] ?? ''}
+                                    onChange={(e) =>
+                                        setActionForm((current) => ({ ...current, [field.key]: e.target.value }))
+                                    }
+                                />
+                            </Form.Group>
+                        ))}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="outline-secondary" onClick={() => setActiveAction(null)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" variant="primary">
+                            Confirmar
+                        </Button>
+                    </Modal.Footer>
+                </Form>
+            </Modal>
         </div>
     );
 };
