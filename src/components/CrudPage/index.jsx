@@ -213,6 +213,21 @@ const CrudPage = ({ entity }) => {
             <div className="page-title">{entity.title}</div>
             <MessageHolder />
 
+            {(entity.pageActions || []).length > 0 ? (
+                <div className="page-actions">
+                    {entity.pageActions.map((pageAction) => (
+                        <Button
+                            key={pageAction.key}
+                            type="button"
+                            variant={pageAction.variant || 'outline-primary'}
+                            onClick={() => startAction(pageAction, null)}
+                        >
+                            {pageAction.label}
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
+
             <div className="card-panel">
                 <h2>{editingId != null ? 'Editar registro' : 'Novo registro'}</h2>
                 <Form onSubmit={handleSubmit}>

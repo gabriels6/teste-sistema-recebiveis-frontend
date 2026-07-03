@@ -108,6 +108,16 @@ function crud(resource) {
                 throw extractError(error);
             }
         },
+        // Importa a cotacao de fechamento PTAX (Banco Central) de uma moeda numa
+        // data. Aplicavel a /api/taxas-cambio/importacoes-ptax; recebe
+        // { moeda, data } (data em ISO yyyy-MM-dd) e retorna a taxa gravada.
+        async importarPtax({ moeda, data }) {
+            try {
+                return unwrap(await api.post(`${path}/importacoes-ptax`, { moeda, data }));
+            } catch (error) {
+                throw extractError(error);
+            }
+        },
     };
 }
 
